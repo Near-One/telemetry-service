@@ -1,0 +1,8 @@
+/target
+Dockerfile
+README.md
+.DS_Store
+LICENSE
+generate_entities.sh
+/.github/workflows
+compose.yaml
