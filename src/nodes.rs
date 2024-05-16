@@ -77,7 +77,7 @@ async fn nodes_handler(
             state.metrics.failed_requests.get_or_create(&labels).inc();
             error!("error processing {chain} request: {err:#?}");
             match err {
-                Error::InputError(_) => (StatusCode::BAD_REQUEST, format!("{err:#?}")),
+                Error::InputError(_, _) => (StatusCode::BAD_REQUEST, format!("{err:#?}")),
                 _ => (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:#?}")),
             }
         }
@@ -86,7 +86,7 @@ async fn nodes_handler(
 
 async fn parse_and_store_telemetry(db: &DatabaseConnection, body: String) -> Result<(), Error> {
     let telemetry: TelemetryInfo =
-        serde_json::from_str(&body).map_err(|err| Error::InputError(err.to_string()))?;
+        serde_json::from_str(&body).map_err(|err| Error::InputError(err.to_string(), body))?;
 
     let node = node::ActiveModel {
         id: ActiveValue::Set(telemetry.chain.node_id),

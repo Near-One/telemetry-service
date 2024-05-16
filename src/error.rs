@@ -8,8 +8,8 @@ pub enum Error {
     IOError(#[from] io::Error),
     #[error("DB error")]
     DBError(#[from] sea_orm::DbErr),
-    #[error("input error")]
-    InputError(String),
+    #[error("input error ({0})/n{1}")]
+    InputError(String, String),
     #[error("unknown error")]
     Unknown,
 }
