@@ -16,12 +16,14 @@ async fn main() -> Result<(), Error> {
         &config.database_url,
         MAINNET_DB_NAME,
         config.max_connections,
+        &config.sslmode,
     )
     .await?;
     let db_testnet = connect_and_refresh_schema(
         &config.database_url,
         TESTNET_DB_NAME,
         config.max_connections,
+        &config.sslmode,
     )
     .await?;
 

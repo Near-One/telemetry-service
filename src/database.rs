@@ -13,8 +13,9 @@ async fn connect(
     db_url: &str,
     db_name: &str,
     max_connections: u32,
+    sslmode: &str,
 ) -> Result<DatabaseConnection, Error> {
-    let mut opt = ConnectOptions::new(db_url);
+    let mut opt = ConnectOptions::new(format!("{db_url}?sslmode={sslmode}"));
     opt.max_connections(max_connections)
         .min_connections(5.min(max_connections));
     let db = Database::connect(opt).await?;
@@ -37,8 +38,11 @@ async fn connect(
                 ))
                 .await?;
             }
-            let url = format!("{}/{}", db_url, db_name);
-            Database::connect(&url).await?
+            let url = format!("{db_url}/{db_name}?sslmode={sslmode}");
+            let mut opt = ConnectOptions::new(url);
+            opt.max_connections(max_connections)
+                .min_connections(5.min(max_connections));
+            Database::connect(opt).await?
         }
         DbBackend::Sqlite => unimplemented!(),
     };
@@ -52,8 +56,9 @@ pub async fn connect_and_refresh_schema(
     db_url: &str,
     db_name: &str,
     max_connections: u32,
+    sslmode: &str,
 ) -> Result<DatabaseConnection, Error> {
-    let db = connect(db_url, db_name, max_connections).await?;
+    let db = connect(db_url, db_name, max_connections, sslmode).await?;
     let pending = Migrator::get_pending_migrations(&db).await?.len();
     if pending == 0 {
         info!("no database migrations to apply");
