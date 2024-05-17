@@ -1,6 +1,6 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, ExecResult, Statement};
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::server::ServerState;
 
@@ -17,7 +17,7 @@ pub(crate) async fn health_handler(state: State<ServerState>) -> impl IntoRespon
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
 
-    info!("health check: success");
+    debug!("health check: success");
     StatusCode::OK
 }
 
