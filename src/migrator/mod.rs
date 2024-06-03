@@ -1,7 +1,7 @@
 use sea_orm_migration::prelude::*;
 
 mod m20240508_000001_create_tables;
-mod m20240603_000002_add_extra_fields;
+mod m20240603_000002_node_v2;
 
 pub struct Migrator;
 
@@ -10,7 +10,7 @@ impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
             Box::new(m20240508_000001_create_tables::Migration),
-            Box::new(m20240603_000002_add_extra_fields::Migration),
+            Box::new(m20240603_000002_node_v2::Migration),
         ]
     }
 }

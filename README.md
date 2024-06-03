@@ -5,10 +5,16 @@ An application to collect NEAR clients telemetry data and store it in a relation
 ## Endpoints
 Default port: `8080`
 
-- `/nodes/mainnet`: POST node telemetry 
-- `/nodes/testnet`: POST node telemetry 
+- `/nodes/mainnet`: POST node telemetry v1+
+- `/nodes/testnet`: POST node telemetry v1+
+- `/nodes`: POST node telemetry v2+
 - `/metrics`: Prometheus metrics
 - `/healthz`: health check
+
+## Telemetry versions
+
+- `v1`: legacy telemetry format
+- `v2`: new telemetry format post [#11444](https://github.com/near/nearcore/pull/11444)
 
 ## Development
 

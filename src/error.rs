@@ -10,6 +10,8 @@ pub enum Error {
     DBError(#[from] sea_orm::DbErr),
     #[error("input error ({0})/n{1}")]
     InputError(String, String),
+    #[error("database not found error")]
+    DatabaseNotFound,
     #[error("unknown error")]
     Unknown,
 }

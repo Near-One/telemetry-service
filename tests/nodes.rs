@@ -16,6 +16,7 @@ use test_log::test;
 const MOCK_SOCKET_ADDRESS: SocketAddr =
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
+// Wrong URLs should return 404.
 #[test(tokio::test)]
 async fn wrong_path() {
     let db_mainnet = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
@@ -36,10 +37,12 @@ async fn wrong_path() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }
 
+// Check that HTTP methods other than POST are rejected.
 #[test(tokio::test)]
 async fn wrong_method() {
     wrong_method_impl("/nodes/mainnet").await;
     wrong_method_impl("/nodes/testnet").await;
+    wrong_method_impl("/nodes").await;
 }
 
 async fn wrong_method_impl(uri: &str) {
@@ -56,10 +59,12 @@ async fn wrong_method_impl(uri: &str) {
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
+// Check that non utf8 strings are rejected.
 #[test(tokio::test)]
 async fn non_utf8_error() {
     non_utf8_error_impl("/nodes/mainnet").await;
     non_utf8_error_impl("/nodes/testnet").await;
+    non_utf8_error_impl("/nodes").await;
 }
 
 async fn non_utf8_error_impl(uri: &str) {
@@ -83,10 +88,12 @@ async fn non_utf8_error_impl(uri: &str) {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+// Unparsable JSON should be rejected.
 #[test(tokio::test)]
 async fn wrong_input_error() {
     wrong_input_error_impl("/nodes/mainnet").await;
     wrong_input_error_impl("/nodes/testnet").await;
+    wrong_input_error_impl("/nodes").await;
 }
 
 async fn wrong_input_error_impl(uri: &str) {
@@ -110,8 +117,7 @@ async fn wrong_input_error_impl(uri: &str) {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-#[test(tokio::test)]
-async fn entity_insert() {
+fn mock_node_and_exec() -> (node::Model, MockExecResult) {
     // Values for mock node and exec don't really matter.
     let mock_node = node::Model {
         id: String::new(),
@@ -141,6 +147,13 @@ async fn entity_insert() {
         last_insert_id: 1,
         rows_affected: 1,
     };
+    (mock_node, mock_exec)
+}
+
+// Verify happy path for ingestion of telemetry data v1.
+#[test(tokio::test)]
+async fn entity_insert_v1() {
+    let (mock_node, mock_exec) = mock_node_and_exec();
 
     let db_mainnet = MockDatabase::new(DatabaseBackend::Postgres)
         .append_query_results([vec![mock_node.clone()]])
@@ -154,33 +167,164 @@ async fn entity_insert() {
     let json = fs::read_to_string("res/example_telemetry_payload_v1").unwrap();
     let server = Server::new(MOCK_SOCKET_ADDRESS, db_mainnet, db_testnet).unwrap();
 
-    let app = server.app();
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/nodes/mainnet")
-                .method("POST")
-                .body(Body::from(json.clone()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
-
-    let app = server.app();
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/nodes/testnet")
-                .method("POST")
-                .body(Body::from(json.clone()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    for uri in ["/nodes/mainnet", "/nodes/testnet"] {
+        let app = server.app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .method("POST")
+                    .body(Body::from(json.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
 
     let (db_mainnet, db_testnet) = server.into_db_connections();
-    assert_eq!(db_mainnet.unwrap().into_transaction_log().len(), 1,);
-    assert_eq!(db_testnet.unwrap().into_transaction_log().len(), 1,);
+    assert_eq!(db_mainnet.unwrap().into_transaction_log().len(), 1);
+    assert_eq!(db_testnet.unwrap().into_transaction_log().len(), 1);
+}
+
+// Verify happy path for ingestion of telemetry data v2, with chain-id: testnet.
+#[test(tokio::test)]
+async fn entity_insert_v2_testnet() {
+    let (mock_node, mock_exec) = mock_node_and_exec();
+
+    let db_mainnet = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+    let db_testnet = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_query_results([vec![mock_node; 3]])
+        .append_exec_results([mock_exec.clone(), mock_exec.clone(), mock_exec.clone()])
+        .into_connection();
+
+    let json = fs::read_to_string("res/example_telemetry_payload_v2_testnet").unwrap();
+    let server = Server::new(MOCK_SOCKET_ADDRESS, db_mainnet, db_testnet).unwrap();
+
+    for uri in ["/nodes", "/nodes/mainnet", "/nodes/testnet"] {
+        let app = server.app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .method("POST")
+                    .body(Body::from(json.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    let (db_mainnet, db_testnet) = server.into_db_connections();
+    assert_eq!(db_mainnet.unwrap().into_transaction_log().len(), 0);
+    assert_eq!(db_testnet.unwrap().into_transaction_log().len(), 3);
+}
+
+// Verify happy path for ingestion of telemetry data v2, with chain-id: mainnet.
+#[test(tokio::test)]
+async fn entity_insert_v2_mainnet() {
+    let (mock_node, mock_exec) = mock_node_and_exec();
+
+    let db_mainnet = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_query_results([vec![mock_node; 3]])
+        .append_exec_results([mock_exec.clone(), mock_exec.clone(), mock_exec.clone()])
+        .into_connection();
+    let db_testnet = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+
+    let json = fs::read_to_string("res/example_telemetry_payload_v2_mainnet").unwrap();
+    let server = Server::new(MOCK_SOCKET_ADDRESS, db_mainnet, db_testnet).unwrap();
+
+    for uri in ["/nodes", "/nodes/mainnet", "/nodes/testnet"] {
+        let app = server.app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .method("POST")
+                    .body(Body::from(json.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    let (db_mainnet, db_testnet) = server.into_db_connections();
+    assert_eq!(db_mainnet.unwrap().into_transaction_log().len(), 3);
+    assert_eq!(db_testnet.unwrap().into_transaction_log().len(), 0);
+}
+
+// Verify happy path for ingestion of telemetry data v2, with chain-id: other.
+#[test(tokio::test)]
+async fn entity_insert_v2_other() {
+    let (mock_node, mock_exec) = mock_node_and_exec();
+
+    let db_mainnet = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_query_results([vec![mock_node.clone()]])
+        .append_exec_results([mock_exec.clone()])
+        .into_connection();
+    let db_testnet = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_query_results([vec![mock_node.clone()]])
+        .append_exec_results([mock_exec.clone()])
+        .into_connection();
+
+    let json = fs::read_to_string("res/example_telemetry_payload_v2_other").unwrap();
+    let server = Server::new(MOCK_SOCKET_ADDRESS, db_mainnet, db_testnet).unwrap();
+
+    for uri in ["/nodes", "/nodes/mainnet", "/nodes/testnet"] {
+        let app = server.app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .method("POST")
+                    .body(Body::from(json.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    let (db_mainnet, db_testnet) = server.into_db_connections();
+    assert_eq!(db_mainnet.unwrap().into_transaction_log().len(), 0);
+    assert_eq!(db_testnet.unwrap().into_transaction_log().len(), 0);
+}
+
+// Verify corner cases for ingestion of telemetry data v2, when chain-id is missing.
+#[test(tokio::test)]
+async fn entity_insert_v2_backward_compatibility() {
+    let (mock_node, mock_exec) = mock_node_and_exec();
+
+    let db_mainnet = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_query_results([vec![mock_node.clone()]])
+        .append_exec_results([mock_exec.clone()])
+        .into_connection();
+    let db_testnet = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_query_results([vec![mock_node.clone()]])
+        .append_exec_results([mock_exec.clone()])
+        .into_connection();
+
+    let json = fs::read_to_string("res/example_telemetry_payload_v1").unwrap();
+    let server = Server::new(MOCK_SOCKET_ADDRESS, db_mainnet, db_testnet).unwrap();
+
+    for uri in ["/nodes", "/nodes/mainnet", "/nodes/testnet"] {
+        let app = server.app();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .method("POST")
+                    .body(Body::from(json.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    let (db_mainnet, db_testnet) = server.into_db_connections();
+    assert_eq!(db_mainnet.unwrap().into_transaction_log().len(), 1);
+    assert_eq!(db_testnet.unwrap().into_transaction_log().len(), 1);
 }

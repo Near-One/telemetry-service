@@ -13,7 +13,7 @@ use tracing::info;
 
 use crate::health::health_handler;
 use crate::metrics::{create_registry_and_metrics, metric_handler, Metrics};
-use crate::nodes::{nodes_handler_mainnet, nodes_handler_testnet, ChainId};
+use crate::nodes::{nodes_handler, nodes_handler_mainnet, nodes_handler_testnet, ChainId};
 use crate::Error;
 
 pub struct Server {
@@ -30,10 +30,11 @@ pub(crate) struct ServerState {
 }
 
 impl ServerState {
-    pub(crate) fn database(&self, chain: ChainId) -> &Arc<DatabaseConnection> {
+    pub(crate) fn database(&self, chain: &ChainId) -> Option<&Arc<DatabaseConnection>> {
         match chain {
-            ChainId::Mainnet => &self.db_mainnet,
-            ChainId::Testnet => &self.db_testnet,
+            ChainId::Mainnet => Some(&self.db_mainnet),
+            ChainId::Testnet => Some(&self.db_testnet),
+            ChainId::Other(_) => None,
         }
     }
 }
@@ -73,6 +74,7 @@ impl Server {
             .route("/healthz", get(health_handler))
             .route("/nodes/mainnet", post(nodes_handler_mainnet))
             .route("/nodes/testnet", post(nodes_handler_testnet))
+            .route("/nodes", post(nodes_handler))
             .layer((
                 // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
                 // requests don't hang forever.

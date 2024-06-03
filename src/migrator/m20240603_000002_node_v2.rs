@@ -4,7 +4,7 @@ pub struct Migration;
 
 impl MigrationName for Migration {
     fn name(&self) -> &str {
-        "m_20240603_000002_add_extra_fields"
+        "m_20240603_000002_node_v2"
     }
 }
 
