@@ -31,6 +31,8 @@ pub struct Model {
     pub max_block_production_delay: f64,
     #[sea_orm(column_type = "Double")]
     pub max_block_wait_delay: f64,
+    pub chain_id: Option<String>,
+    pub protocol_version: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

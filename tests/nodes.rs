@@ -134,6 +134,8 @@ async fn entity_insert() {
         min_block_production_delay: 0.0,
         max_block_production_delay: 0.0,
         max_block_wait_delay: 0.0,
+        chain_id: None,
+        protocol_version: None,
     };
     let mock_exec = MockExecResult {
         last_insert_id: 1,
@@ -149,7 +151,7 @@ async fn entity_insert() {
         .append_exec_results([mock_exec.clone()])
         .into_connection();
 
-    let json = fs::read_to_string("example_telemetry_payload").unwrap();
+    let json = fs::read_to_string("res/example_telemetry_payload_v1").unwrap();
     let server = Server::new(MOCK_SOCKET_ADDRESS, db_mainnet, db_testnet).unwrap();
 
     let app = server.app();

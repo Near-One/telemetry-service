@@ -111,6 +111,8 @@ async fn parse_and_store_telemetry(db: &DatabaseConnection, body: String) -> Res
         min_block_production_delay: ActiveValue::Set(telemetry.chain.min_block_production_delay),
         max_block_production_delay: ActiveValue::Set(telemetry.chain.max_block_production_delay),
         max_block_wait_delay: ActiveValue::Set(telemetry.chain.max_block_wait_delay),
+        chain_id: ActiveValue::Set(None),
+        protocol_version: ActiveValue::Set(None),
     };
 
     let on_conflict = OnConflict::column(node::Column::Id)

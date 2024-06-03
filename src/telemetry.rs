@@ -6,6 +6,8 @@ pub struct TelemetryAgentInfo {
     pub name: String,
     pub version: String,
     pub build: String,
+    // Added in https://github.com/near/nearcore/pull/11444.
+    pub protocol_version: Option<u32>,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -19,6 +21,8 @@ pub struct TelemetrySystemInfo {
 
 #[derive(serde::Deserialize, Debug)]
 pub struct TelemetryChainInfo {
+    // Added in https://github.com/near/nearcore/pull/11444.
+    pub chain_id: Option<String>,
     pub node_id: String,
     // Changed from `Option<AccountId>` to `Option<String>`.
     pub account_id: Option<String>,
